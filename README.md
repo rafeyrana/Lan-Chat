@@ -20,7 +20,30 @@ cmd/chat && go run . -port 9001 --peer <addr> && cd ../..
 Replace `<peerID>` with the value printed by the first terminal. 
 
 
+
 test: Try to chat back and worth with both terminals and that should work
+
+Stage 2: MDNS Peer Discovery over Local networks
+
+- functionality: Can connect to and interact with a peer on the same network automatically without needing to find by addr which was not applicable in a real world scenario.
+
+- use a rendezvouz (ive been trying to spell this right for 30 mins) flag to give an identity to broadcast to the network as well as subscribe to only accept mDNS messages advertising the same flag. this allows them to connect to a single decentralized 'room' on a local network.
+
+Testing:
+
+terminal 1:
+```
+cd cmd/chat && go run . -port 2000 --rendezvous myroom && cd ../..
+```
+
+terminal 2: 
+```
+cd cmd/chat && go run . -port 0 --rendezvous myroom && cd ../..
+```
+
+wait for `✓ mDNS connected to` logs on both ends and continue chatting
+
+note: no need for the address, nodes autoconnect with multicast peer discovery
 
 
 rough brain info log for showing decision making here: 
@@ -50,3 +73,5 @@ Announces “service records” (_http._tcp, _workstation._tcp, …).
 Lets machines discover each other without a central DNS server.
 
 libp2p advertises your peer as a _p2p._udp style service containing its multi-addr, namespaced by a “rendezvous” string
+
+
