@@ -7,22 +7,29 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
+	"strings"
 
 	redop2p "redonet/internal/p2p"
 
-	"github.com/libp2p/go-libp2p/core/network"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-const chatProtocolID = "/redonet/1.0.0"
+// Stage 3: we no longer use raw streams; chat is via GossipSub.
+
+const (
+	colorReset = "\033[0m"
+	colorGreen = "\033[32m"
+	colorCyan  = "\033[36m"
+)
 
 func main() {
 	port := flag.String("port", "0", "tcp port to listen on (0 = random)")
 	peerAddr := flag.String("peer", "", "optional multiaddr of peer to dial")
-	rendezvous := flag.String("rendezvous", "redonet-chat", "rendezvous string for mDNS discovery") // rendezvous string for mDNS discovery
+	rendezvous := flag.String("rendezvous", "redonet-chat", "rendezvous string for mDNS discovery")
+	nickFlag := flag.String("nick", "anon", "nickname to display")
+	roomFlag := flag.String("room", "main", "chat room name")
 	flag.Parse()
 
 	h, err := redop2p.CreateHost(*port)
@@ -36,8 +43,23 @@ func main() {
 		fmt.Println("Listening on:", addr.Encapsulate(peerIDToAddr(h.ID())))
 	}
 
-	// Register handler for incoming chat streams
-	h.SetStreamHandler(chatProtocolID, handleStream)
+	// Initialise GossipSub
+	ps, err := pubsub.NewGossipSub(context.Background(), h)
+	if err != nil {
+		log.Fatalf("gossipsub init: %v", err)
+	}
+
+	cr, err := redop2p.JoinChatRoom(context.Background(), ps, h.ID(), *nickFlag, *roomFlag)
+	if err != nil {
+		log.Fatalf("join chat room: %v", err)
+	}
+
+	// Printer goroutine for incoming messages
+	go func() {
+		for m := range cr.Messages {
+			fmt.Printf("%s[%s]%s %s\n", colorCyan, m.SenderNick, colorReset, m.Message)
+		}
+	}()
 
 	// Step 2: mDNS discovery 
 	peerChan := redop2p.InitMDNS(h, *rendezvous)
@@ -55,11 +77,6 @@ func main() {
 			if h.ID() < pi.ID {
 				if err := h.Connect(ctx, pi); err != nil {
 					fmt.Println("connect error:", err)
-					continue
-				}
-				fmt.Println("✓ mDNS connected to", pi.ID)
-				if s, err := h.NewStream(ctx, pi.ID, chatProtocolID); err == nil {
-					go chat(s)
 				}
 			}
 		}
@@ -72,60 +89,33 @@ func main() {
 		if err != nil {
 			log.Fatalf("invalid peer address: %v", err)
 		}
+		// dial only to establish connectivity; pubsub works afterwards
 		if err := h.Connect(context.Background(), *ai); err != nil {
 			log.Fatalf("connection failed: %v", err)
 		}
-		// open a stream and launch chat
-		stream, err := h.NewStream(context.Background(), ai.ID, chatProtocolID)
-		if err != nil {
-			log.Fatalf("opening stream: %v", err)
-		}
-		go chat(stream)
 	}
 
-	// Wait for Ctrl-C
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	// STDIN publisher loop
+	stdin := bufio.NewReader(os.Stdin)
+	for {
+		line, err := stdin.ReadString('\n')
+		if err != nil {
+			log.Println("stdin error:", err)
+			break
+		}
+		text := strings.TrimSpace(line)
+		if text == "" {
+			continue
+		}
+		// echo own message locally in green
+		fmt.Printf("%s[You]%s %s\n", colorGreen, colorReset, text)
+		if err := cr.Publish(text); err != nil {
+			log.Printf("publish error: %v", err)
+		}
+	}
+
 	fmt.Println("Shutting down…")
 	_ = h.Close()
-}
-
-func handleStream(s network.Stream) {
-	go chat(s)
-	// calls the caht function in a seperate go routine on the stream
-}
-
-// chat pumps stdin lines to the stream and echoes received lines to stdout.
-func chat(s network.Stream) {
-	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-
-	// Outgoing goroutine
-	go func() {
-		stdin := bufio.NewReader(os.Stdin)
-		for {
-			line, err := stdin.ReadString('\n')
-			if err != nil {
-				log.Println("stdin error:", err)
-				return
-			}
-			if _, err := rw.WriteString(line); err != nil {
-				log.Println("write error:", err)
-				return
-			}
-			_ = rw.Flush()
-		}
-	}()
-
-	// Incoming loop
-	for {
-		line, err := rw.ReadString('\n')
-		if err != nil {
-			log.Println("read error:", err)
-			return
-		}
-		fmt.Printf("%s", line)
-	}
 }
 
 func parseAddrInfo(addr string) (*peer.AddrInfo, error) {
