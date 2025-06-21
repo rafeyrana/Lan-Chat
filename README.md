@@ -43,6 +43,24 @@ wait for `✓ mDNS connected to` logs on both ends and continue chatting
 note: no need for the address, nodes autoconnect with multicast peer discovery
 
 
+Stage 3: Gossip Pub Sub
+
+Now that we can subscribe and listen to the messages on the stream for all topics we can optimise this with the Gossibsub algorithm. Gossip pub sub builds mesh overlay for just that topic. just like a message queue:
+
+Pushing: Publish message to topic with a messageid and propogated as a gossip beacaon to all users to avoid duplication
+
+Receiving: Subscribe to topic and only pick up frames with the defined topic
+
+handles late joiners, rejoiners and random user dropping.
+
+Testing:
+
+Run as many users in parallel using the following command:
+```
+d cmd/chat && go run . -port <random_port> --rendezvous <tag> --nick <Identifier> --room <random_room_name> && cd ../..
+```
+
+
 rough brain info log for showing decision making here: 
 
 
@@ -75,3 +93,23 @@ since we are in a decentralized network without a single point of control, we ne
 
 to avoid this simultaneous dial race condition we can use a tie breaker rule to always have the bigger peer to dial the smaller one which allows us to make a single dial call
 
+3. Stage 3
+Now we need a chat room scenario for the 1-M scenario
+
+After some research it seems that the Gossip (Epidemic) Protocal can be a good idea with a pub sub architecture. I remember gossip protocols from undergrad where they propogate messages fault tolreantly through network even with node churn due to the random neighbour selection. they keep data fresh as well.
+
+
+now this gossip protocol with a pub sub architecture is different from a traditional pub sub with an established heirarchal brokers or central brokers to manage / route the messages.
+
+
+In our case we can use a sort of decentralized overlay where each participant will be used to route messages. Upon research it seems that we need to 
+
+1. construct mesh 
+2. pushing messages (eager and lazy pushing) and pulling
+3. message integrity and reliability
+4. logical seperation into rooms at level 4
+5. node health checks
+6. message deduplication
+
+
+Keeping the stage 1 peer address connection because it can be useful across subnets
