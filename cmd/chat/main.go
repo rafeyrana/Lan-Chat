@@ -22,6 +22,7 @@ const chatProtocolID = "/redonet/1.0.0"
 func main() {
 	port := flag.String("port", "0", "tcp port to listen on (0 = random)")
 	peerAddr := flag.String("peer", "", "optional multiaddr of peer to dial")
+	rendezvous := flag.String("rendezvous", "redonet-chat", "rendezvous string for mDNS discovery") // rendezvous string for mDNS discovery
 	flag.Parse()
 
 	h, err := redop2p.CreateHost(*port)
@@ -38,7 +39,31 @@ func main() {
 	// Register handler for incoming chat streams
 	h.SetStreamHandler(chatProtocolID, handleStream)
 
-	// If peer provided, dial it
+	// Step 2: mDNS discovery 
+	peerChan := redop2p.InitMDNS(h, *rendezvous)
+	go func() {
+		ctx := context.Background()
+		for pi := range peerChan {
+			if pi.ID == h.ID() {
+				continue // ignore self
+			}
+			fmt.Println("mDNS discovered", pi.ID, pi.Addrs)
+			// Dial ordering rule: only dial if our peer ID string is lexicographically smaller
+			if h.ID() < pi.ID {
+				if err := h.Connect(ctx, pi); err != nil {
+					fmt.Println("connect error:", err)
+					continue
+				}
+				fmt.Println("✓ mDNS connected to", pi.ID)
+				if s, err := h.NewStream(ctx, pi.ID, chatProtocolID); err == nil {
+					go chat(s)
+				}
+			}
+		}
+	}()
+
+	// stage 2 note : still supporting the peer flag from stage 1
+	// If peer provided, dial it 
 	if *peerAddr != "" {
 		ai, err := parseAddrInfo(*peerAddr)
 		if err != nil {
