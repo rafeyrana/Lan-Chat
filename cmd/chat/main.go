@@ -45,10 +45,13 @@ func main() {
 		ctx := context.Background()
 		for pi := range peerChan {
 			if pi.ID == h.ID() {
-				continue // ignore self
+				continue // ignore self brodcasted messages
 			}
 			fmt.Println("mDNS discovered", pi.ID, pi.Addrs)
 			// Dial ordering rule: only dial if our peer ID string is lexicographically smaller
+
+			// since we are in a decentralized network without a single point of control, we need to ensure both peers do not dial connections with each other if they find the other peer at the same time
+			// to avoid this simultaneous dial race condition we can use a tie breaker rule to always have the bigger peer to dial the smaller one which allows us to make a single dial call
 			if h.ID() < pi.ID {
 				if err := h.Connect(ctx, pi); err != nil {
 					fmt.Println("connect error:", err)
