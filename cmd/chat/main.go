@@ -14,6 +14,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+
+	"redonet/internal/store"
 )
 
 // Stage 3: we no longer use raw streams; chat is via GossipSub.
@@ -31,6 +33,12 @@ func main() {
 	nickFlag := flag.String("nick", "anon", "nickname to display")
 	roomFlag := flag.String("room", "main", "chat room name")
 	flag.Parse()
+
+	// create per-run log files
+	connFile, _ := os.OpenFile("connections.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	chatFile, _ := os.OpenFile("chat.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	connLogger := log.New(connFile, "CONN ", log.LstdFlags)
+	chatLogger := log.New(chatFile, "CHAT ", log.LstdFlags)
 
 	h, err := redop2p.CreateHost(*port)
 	if err != nil {
@@ -54,10 +62,15 @@ func main() {
 		log.Fatalf("join chat room: %v", err)
 	}
 
+	msgStore := store.New(1000)
+
 	// Printer goroutine for incoming messages
 	go func() {
 		for m := range cr.Messages {
-			fmt.Printf("%s[%s]%s %s\n", colorCyan, m.SenderNick, colorReset, m.Message)
+			line := fmt.Sprintf("%s[%s]%s %s", colorCyan, m.SenderNick, colorReset, m.Message)
+			fmt.Println(line)
+			msgStore.Add(fmt.Sprintf("%s: %s", m.SenderNick, m.Message))
+			chatLogger.Printf("%s: %s", m.SenderNick, m.Message)
 		}
 	}()
 
@@ -77,6 +90,8 @@ func main() {
 			if h.ID() < pi.ID {
 				if err := h.Connect(ctx, pi); err != nil {
 					fmt.Println("connect error:", err)
+				} else {
+					connLogger.Printf("connected to %s", pi.ID)
 				}
 			}
 		}
@@ -92,6 +107,8 @@ func main() {
 		// dial only to establish connectivity; pubsub works afterwards
 		if err := h.Connect(context.Background(), *ai); err != nil {
 			log.Fatalf("connection failed: %v", err)
+		} else {
+			connLogger.Printf("manual connect to %s", ai.ID)
 		}
 	}
 
@@ -111,6 +128,9 @@ func main() {
 		fmt.Printf("%s[You]%s %s\n", colorGreen, colorReset, text)
 		if err := cr.Publish(text); err != nil {
 			log.Printf("publish error: %v", err)
+		} else {
+			msgStore.Add(fmt.Sprintf("%s: %s", *nickFlag, text))
+			chatLogger.Printf("%s: %s", *nickFlag, text)
 		}
 	}
 
