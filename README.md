@@ -1,7 +1,4 @@
-# RedoNet – Stage 1: CLI Chat
-
-This folder contains the **minimal skeleton** for Stage 1 of the rebuild plan.
-
+# LAN Chat - Offline LAN based chat
 ## Build
 
 ```bash
