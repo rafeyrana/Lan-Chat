@@ -16,6 +16,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"redonet/internal/store"
+	"redonet/internal/httpapi"
 )
 
 // Stage 3: we no longer use raw streams; chat is via GossipSub.
@@ -32,6 +33,7 @@ func main() {
 	rendezvous := flag.String("rendezvous", "redonet-chat", "rendezvous string for mDNS discovery")
 	nickFlag := flag.String("nick", "anon", "nickname to display")
 	roomFlag := flag.String("room", "main", "chat room name")
+	enableHTTP := flag.Bool("enable-http", false, "start REST API on :3001")
 	flag.Parse()
 
 	// create per-run log files
@@ -63,6 +65,11 @@ func main() {
 	}
 
 	msgStore := store.New(1000)
+
+	// Optional HTTP server
+	if *enableHTTP {
+		httpapi.Start(cr, msgStore, ":3001")
+	}
 
 	// Printer goroutine for incoming messages
 	go func() {
