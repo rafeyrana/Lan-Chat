@@ -1,4 +1,6 @@
 # LAN Chat - Offline LAN based chat
+<img width="2880" height="1620" alt="image" src="https://github.com/user-attachments/assets/9f60a07b-d5f9-4630-8276-ecf8f2434ccd" />
+
 ## Build
 
 ```bash
