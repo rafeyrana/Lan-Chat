@@ -1,5 +1,40 @@
 # LAN Chat - Offline LAN based chat
+
 <img width="2880" height="1620" alt="image" src="https://github.com/user-attachments/assets/9f60a07b-d5f9-4630-8276-ecf8f2434ccd" />
+## Frontend (TypeScript) — Dev, Build, Test
+
+The web client in `frontend/` was migrated from JavaScript to TypeScript and is now built with Vite and tested with Jest (ts-jest + jsdom).
+
+### Prerequisites
+- Node.js 18+
+- npm 9+
+
+### Install dependencies
+```bash
+cd frontend
+npm install
+```
+
+### Start the dev server
+```bash
+npm run dev
+# Open the printed local URL (typically http://localhost:5173)
+```
+
+### Build for production
+```bash
+npm run build
+```
+
+### Run tests (with coverage)
+```bash
+npm test
+```
+
+Test coverage focuses on pure utilities and DOM-manipulating functions (e.g., message parsing, debouncing, theme/icon toggles, connection status indicators, and input character counter). The module auto-init is disabled under `NODE_ENV=test` to keep tests deterministic.
+
+
+
 
 ## Build
 
@@ -81,14 +116,13 @@ cd cmd/chat && go run . --port 9000 \
 cd cmd/chat && go run . --port 0 --rendezvous myroom --nick Bob --room main && cd ../..
 ```
 
-3. **Serve the static HTML UI**
+3. **Run the web UI**
 
-```bash
-cd frontend
-# any static file server works; here's Python 3:
-python3 -m http.server 8080
-# now browse to http://localhost:8080
+Using the dev server (recommended during development):
 ```
+cd frontend && npm run dev
+```
+Or serve a production build from any static server after `npm run build`.
 
 4. In the browser, send a message – it should appear:
    • immediately in the web UI (`[You] …`)
