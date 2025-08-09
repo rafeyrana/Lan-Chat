@@ -1,5 +1,6 @@
 # LAN Chat - Offline LAN based chat
 
+<img width="2880" height="1620" alt="image" src="https://github.com/user-attachments/assets/9f60a07b-d5f9-4630-8276-ecf8f2434ccd" />
 ## Frontend (TypeScript) — Dev, Build, Test
 
 The web client in `frontend/` was migrated from JavaScript to TypeScript and is now built with Vite and tested with Jest (ts-jest + jsdom).
@@ -31,6 +32,9 @@ npm test
 ```
 
 Test coverage focuses on pure utilities and DOM-manipulating functions (e.g., message parsing, debouncing, theme/icon toggles, connection status indicators, and input character counter). The module auto-init is disabled under `NODE_ENV=test` to keep tests deterministic.
+
+
+
 
 ## Build
 
